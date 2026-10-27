@@ -10,6 +10,13 @@ import {
   calculateLevel,
 } from '@/utils/storage';
 
+export interface RecordAnswerResult {
+  stats: GameStats;
+  leveledUp: boolean;
+  xpGain: number;
+  newLevel: number;
+}
+
 export const useGameStats = () => {
   const [stats, setStats] = useState<GameStats>(INITIAL_GAME_STATS);
   const [loading, setLoading] = useState<boolean>(true);
@@ -39,7 +46,7 @@ export const useGameStats = () => {
    * Records an answer attempt, calculates streak, XP, level, and updates offline storage
    */
   const recordAnswer = useCallback(
-    async (category: string, isCorrect: boolean): Promise<GameStats> => {
+    async (category: string, isCorrect: boolean): Promise<RecordAnswerResult> => {
       const today = getTodayDateString();
       const yesterday = getYesterdayDateString();
 
@@ -61,6 +68,7 @@ export const useGameStats = () => {
       const xpGain = isCorrect ? 10 + Math.min(newStreak, 5) * 2 : 0;
       const newXp = stats.xp + xpGain;
       const newLevel = calculateLevel(newXp);
+      const leveledUp = newLevel > stats.level;
 
       const currentCategoryScore = stats.categoryHighScores[category] ?? 0;
       const newCategoryScore = isCorrect ? currentCategoryScore + 1 : currentCategoryScore;
@@ -83,7 +91,12 @@ export const useGameStats = () => {
 
       setStats(updatedStats);
       await saveGameStats(updatedStats);
-      return updatedStats;
+      return {
+        stats: updatedStats,
+        leveledUp,
+        xpGain,
+        newLevel,
+      };
     },
     [stats]
   );

@@ -13,6 +13,7 @@ import { Palette, Typography, Spacing, BorderRadius, NeoStyles } from '@/constan
 import { NeoButton } from '@/components/ui/NeoButton';
 import { NeoCard } from '@/components/ui/NeoCard';
 import { NeoAdBanner } from '@/components/ads/NeoAdBanner';
+import { LevelUpModal } from '@/components/ui/LevelUpModal';
 import {
   generateArithmeticQuestion,
   generateAdvancedQuestion,
@@ -38,6 +39,10 @@ export default function HomeScreen() {
   const [isAnswered, setIsAnswered] = useState<boolean>(false);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string>('');
+
+  // Celebration state
+  const [levelUpVisible, setLevelUpVisible] = useState<boolean>(false);
+  const [newLevelReached, setNewLevelReached] = useState<number>(1);
 
   // Built-in Pastel Calculator Modal State
   const [calcVisible, setCalcVisible] = useState<boolean>(false);
@@ -99,13 +104,18 @@ export default function HomeScreen() {
     setIsCorrect(correct);
 
     const categoryKey = tier === 'arithmetic' ? arithmeticOp : advancedCat;
-    await recordAnswer(categoryKey, correct);
+    const result = await recordAnswer(categoryKey, correct);
 
     if (correct) {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       } catch {}
-      setFeedbackMsg('🎯 AWESOME! +10 XP');
+      setFeedbackMsg(`🎯 AWESOME! +${result.xpGain} XP`);
+
+      if (result.leveledUp) {
+        setNewLevelReached(result.newLevel);
+        setTimeout(() => setLevelUpVisible(true), 350);
+      }
     } else {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
@@ -345,7 +355,10 @@ export default function HomeScreen() {
               {['C', '(', ')', '÷', '7', '8', '9', '×', '4', '5', '6', '-', '1', '2', '3', '+', '0', '.', '='].map((key) => (
                 <Pressable
                   key={key}
-                  style={styles.calcKey}
+                  style={({ pressed }) => [
+                    styles.calcKey,
+                    pressed && styles.calcKeyPressed,
+                  ]}
                   onPress={() => handleCalcPress(key)}
                 >
                   <Text style={styles.calcKeyText}>{key}</Text>
@@ -355,6 +368,13 @@ export default function HomeScreen() {
           </NeoCard>
         </View>
       </Modal>
+
+      {/* 5. Level Up Celebration Modal */}
+      <LevelUpModal
+        visible={levelUpVisible}
+        level={newLevelReached}
+        onDismiss={() => setLevelUpVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -614,5 +634,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: Palette.text,
+  },
+  calcKeyPressed: {
+    transform: [{ translateX: 1 }, { translateY: 1 }],
+    elevation: 1,
   },
 });

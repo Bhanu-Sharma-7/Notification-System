@@ -79,6 +79,22 @@ export default function ExploreScreen() {
       unlocked: stats.level >= 5,
       color: 'butterYellow',
     },
+    {
+      id: 'daily_grinder',
+      title: 'DAILY GRINDER',
+      desc: 'Maintain a 7-day daily streak',
+      icon: '🗓️',
+      unlocked: stats.bestStreak >= 7,
+      color: 'softCoral',
+    },
+    {
+      id: 'math_ninja',
+      title: 'MATH NINJA',
+      desc: 'Reach Level 10 mastery',
+      icon: '🥷',
+      unlocked: stats.level >= 10,
+      color: 'mint',
+    },
   ];
 
   const handleReset = () => {
