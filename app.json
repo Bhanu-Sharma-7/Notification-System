@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "2",
+    "scheme": "mathcrush",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"

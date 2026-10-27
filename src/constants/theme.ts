@@ -1,26 +1,119 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+import { Platform, StyleSheet, ViewStyle } from 'react-native';
 
-import '@/global.css';
+// ---------------------------------------------------------------------------
+// 🎨 Pastel Neo-Brutalist Theme Tokens
+// ---------------------------------------------------------------------------
 
-import { Platform } from 'react-native';
+export const Palette = {
+  // Canvas & Core
+  background: '#F5F2EB', // Warm cozy pastel cream canvas
+  card: '#FFFFFF', // Pure crisp white surface
+  border: '#18181B', // Solid 2.5px Deep Charcoal
+  text: '#18181B', // High-contrast charcoal text
+  textMuted: '#6B7280', // Secondary muted text
+  white: '#FFFFFF',
+  black: '#18181B',
+
+  // Tactile Pastel Accents & Shadows
+  mint: '#70C1B3',
+  peach: '#FFE5D9',
+  butterYellow: '#FFE169',
+  softCoral: '#FFAAA6',
+  lavender: '#E8EAFF',
+} as const;
+
+export const Typography = {
+  display: 'LuckiestGuy',
+  badge: 'Bungee',
+  sans: 'System',
+} as const;
+
+export const Spacing = {
+  // Semantic scales
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+
+  // Starter template numeric backward-compatibility
+  half: 2,
+  one: 4,
+  two: 8,
+  three: 16,
+  four: 24,
+  five: 32,
+  six: 64,
+} as const;
+
+export const BorderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  full: 9999,
+} as const;
+
+export const NeoStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Palette.card,
+    borderWidth: 2.5,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.lg,
+    shadowColor: Palette.border,
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
+  } as ViewStyle,
+
+  button: {
+    borderWidth: 2.5,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.md,
+    shadowColor: Palette.border,
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
+  } as ViewStyle,
+
+  badge: {
+    borderWidth: 2,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.sm,
+    shadowColor: Palette.border,
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+  } as ViewStyle,
+
+  buttonPressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+    shadowOffset: { width: 1, height: 1 },
+    elevation: 1,
+  } as ViewStyle,
+});
+
+// ---------------------------------------------------------------------------
+// 🔄 Compatibility Layer for Expo Starter Files
+// ---------------------------------------------------------------------------
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: Palette.text,
+    background: Palette.background,
+    backgroundElement: Palette.peach,
+    backgroundSelected: Palette.mint,
+    textSecondary: Palette.textMuted,
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#FFFFFF',
+    background: '#18181B',
+    backgroundElement: '#27272A',
+    backgroundSelected: '#3F3F46',
+    textSecondary: '#A1A1AA',
   },
 } as const;
 
@@ -28,13 +121,9 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
@@ -51,15 +140,15 @@ export const Fonts = Platform.select({
   },
 });
 
-export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
-} as const;
-
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+export default {
+  Palette,
+  Typography,
+  Spacing,
+  BorderRadius,
+  NeoStyles,
+  Colors,
+  Fonts,
+};
