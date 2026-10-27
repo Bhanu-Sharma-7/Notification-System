@@ -15,8 +15,8 @@ Ek 100% offline-first, engaging aur addictive Math Calculation Game jisme childr
 - **Physical Press Feedback:** Har interactive element (buttons, cards, badges) active press state par physical tactile button jaisa translate shift (`translateX: 2, translateY: 2`, shadow reduction) provide karega.
 - **Pastel Palette:**
   - Mint Green: `#70C1B3` (Success, Correct Answers)
-  - Soft Coral: `#FFAAA6` (Alerts, Wrong Answers, Danger)
-  - Butter Yellow: `#FFE169` (Streaks, Primary Action Highlights)
+  - Soft Coral: `#FFAAA6` (Alerts, Wrong Answers, Danger, Low Timer)
+  - Butter Yellow: `#FFE169` (Streaks, Primary Action Highlights, Power-ups)
   - Soft Peach: `#FFE5D9` (Cards & Secondary Surfaces)
   - Lavender: `#E8EAFF` (Badges & Categories)
   - White: `#FFFFFF` (Surface Contrast)
@@ -33,22 +33,30 @@ Ek 100% offline-first, engaging aur addictive Math Calculation Game jisme childr
    - **Advanced:** Trigonometry identities, Squares ($x^2$), Square Roots ($\sqrt{x}$), Cubes ($x^3$), and Percentages ($x\%$).
    - **Options:** 4 options (1 correct answer + 3 smart plausible distractors), shuffled.
 
-2. **Gamification & Rewards:**
+2. **Game Modes:**
+   - **Classic Practice:** Relaxed, untimed mode for steady learning.
+   - **Blitz Speedrun (60s Time Attack):** Intense 60-second challenge with chunky animated countdown timer, speed multipliers, and blitz high score record.
+
+3. **Power-ups & Streak Protection (Zero Server Cost):**
+   - **50-50 Eliminator:** Removes 2 wrong options instantly to help solve tough questions.
+   - **Streak Freeze:** Consumable power-up that shields daily streaks against missed days or wrong streaks.
+   - Power-ups inventory persisted in `AsyncStorage`.
+
+4. **Gamification & Rewards:**
    - **Dynamic XP System:** Base XP (10) + Streak Multiplier (`Math.min(streak, 5) * 2`).
    - **Level Progression:** Dynamic Level calculation (`Math.floor(XP / 100) + 1`).
    - **Celebration Modal:** Pop-up celebration dialog on leveling up with confetti/visual flair and haptic celebration.
    - **Daily Streaks:** Tracks active days, consecutive streaks, and best streak records.
-   - **6+ Unlockable Badges:** Rookie Solver (5 questions), Streak Master (3-day streak), Quick Thinker (25 questions), Sharpshooter (80%+ accuracy), Century Club (100 questions), Grandmaster (Level 5).
+   - **8+ Unlockable Badges:** Rookie Solver, Streak Master, Quick Thinker, Sharpshooter, Century Club, Grandmaster, Daily Grinder, Math Ninja.
 
-3. **Built-in Pastel Calculator Utility:**
+5. **Audio Effects & Sound Engine:**
+   - Clean, lightweight sound cues (success chime, error buzz, tactile tap) synchronized with haptics.
+   - Global sound mute toggle (`🔊 / 🔇`) in top navigation header.
+
+6. **Built-in Pastel Calculator Utility:**
    - Quick-access bottom sheet / modal scratchpad calculator with tactile keys for scratch calculations.
 
-4. **Deep Haptics & Polish:**
-   - `Light` impact on button presses and calculator keys.
-   - `Success` notification vibration on correct answers.
-   - `Warning` notification vibration on wrong answers.
-
-5. **Monetization Architecture:**
+7. **Monetization Architecture:**
    - Neo-brutalist styled `NeoAdBanner` card placeholder ready for Google AdMob insertion.
 
 ---

@@ -95,6 +95,14 @@ export default function ExploreScreen() {
       unlocked: stats.level >= 10,
       color: 'mint',
     },
+    {
+      id: 'blitz_master',
+      title: 'BLITZ MASTER',
+      desc: 'Score 500+ points in 60s Blitz mode',
+      icon: '⚡',
+      unlocked: stats.blitzHighScore >= 500,
+      color: 'butterYellow',
+    },
   ];
 
   const handleReset = () => {
@@ -151,6 +159,18 @@ export default function ExploreScreen() {
             <View style={[styles.breakdownPill, { backgroundColor: Palette.butterYellow }]}>
               <Text style={styles.breakdownValue}>{stats.bestStreak}d</Text>
               <Text style={styles.breakdownLabel}>BEST STREAK</Text>
+            </View>
+          </View>
+
+          <View style={styles.secondaryBreakdownRow}>
+            <View style={[styles.secondaryPill, { backgroundColor: Palette.butterYellow }]}>
+              <Text style={styles.secondaryPillText}>⚡ BLITZ RECORD: {stats.blitzHighScore} PTS</Text>
+            </View>
+            <View style={[styles.secondaryPill, { backgroundColor: Palette.peach }]}>
+              <Text style={styles.secondaryPillText}>🎯 50-50s: {stats.powerUps.fiftyFifty}</Text>
+            </View>
+            <View style={[styles.secondaryPill, { backgroundColor: Palette.mint }]}>
+              <Text style={styles.secondaryPillText}>🛡️ SHIELDS: {stats.powerUps.streakFreeze}</Text>
             </View>
           </View>
         </NeoCard>
@@ -351,6 +371,29 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: Palette.text,
     marginTop: 2,
+  },
+  secondaryBreakdownRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+  },
+  secondaryPill: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryPillText: {
+    fontFamily: Typography.badge,
+    fontSize: 9,
+    fontWeight: '800',
+    color: Palette.text,
+    textAlign: 'center',
   },
   breakdownCard: {
     padding: Spacing.lg,

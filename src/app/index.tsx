@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import { NeoButton } from '@/components/ui/NeoButton';
 import { NeoCard } from '@/components/ui/NeoCard';
 import { NeoAdBanner } from '@/components/ads/NeoAdBanner';
 import { LevelUpModal } from '@/components/ui/LevelUpModal';
+import { BlitzTimerBar } from '@/components/game/BlitzTimerBar';
+import { BlitzSummaryModal } from '@/components/game/BlitzSummaryModal';
 import {
   generateArithmeticQuestion,
   generateAdvancedQuestion,
@@ -22,11 +24,19 @@ import {
   AdvancedCategory,
 } from '@/utils/mathEngine';
 import { useGameStats } from '@/hooks/useGameStats';
+import { soundController } from '@/utils/audio';
 
 export default function HomeScreen() {
-  const { stats, recordAnswer } = useGameStats();
+  const {
+    stats,
+    recordAnswer,
+    consumeFiftyFifty,
+    recordBlitzResult,
+    toggleSound,
+  } = useGameStats();
 
   // Mode and Category selection
+  const [gameMode, setGameMode] = useState<'classic' | 'blitz'>('classic');
   const [tier, setTier] = useState<'arithmetic' | 'advanced'>('arithmetic');
   const [arithmeticOp, setArithmeticOp] = useState<OperationType>('addition');
   const [advancedCat, setAdvancedCat] = useState<AdvancedCategory>('trigonometry');
@@ -40,26 +50,43 @@ export default function HomeScreen() {
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string>('');
 
+  // Power-up state
+  const [eliminatedOptions, setEliminatedOptions] = useState<(string | number)[]>([]);
+
   // Celebration state
   const [levelUpVisible, setLevelUpVisible] = useState<boolean>(false);
   const [newLevelReached, setNewLevelReached] = useState<number>(1);
+
+  // Blitz mode state
+  const [blitzActive, setBlitzActive] = useState<boolean>(false);
+  const [blitzSecondsLeft, setBlitzSecondsLeft] = useState<number>(60);
+  const [blitzScore, setBlitzScore] = useState<number>(0);
+  const [blitzCorrectCount, setBlitzCorrectCount] = useState<number>(0);
+  const [blitzTotalAnswered, setBlitzTotalAnswered] = useState<number>(0);
+  const [blitzSummaryVisible, setBlitzSummaryVisible] = useState<boolean>(false);
+  const [blitzNewHighScore, setBlitzNewHighScore] = useState<boolean>(false);
+  const [blitzBonusXp, setBlitzBonusXp] = useState<number>(0);
 
   // Built-in Pastel Calculator Modal State
   const [calcVisible, setCalcVisible] = useState<boolean>(false);
   const [calcExpr, setCalcExpr] = useState<string>('');
   const [calcResult, setCalcResult] = useState<string>('');
 
+  const nextTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const resetQuestionState = (newQ: MathQuestion) => {
     setSelectedOption(null);
     setIsAnswered(false);
     setIsCorrect(null);
     setFeedbackMsg('');
+    setEliminatedOptions([]);
     setQuestion(newQ);
   };
 
   const handleSelectTier = (newTier: 'arithmetic' | 'advanced') => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      soundController.playTap();
     } catch {}
     setTier(newTier);
     if (newTier === 'arithmetic') {
@@ -72,6 +99,7 @@ export default function HomeScreen() {
   const handleSelectArithmeticOp = (op: OperationType) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      soundController.playTap();
     } catch {}
     setArithmeticOp(op);
     resetQuestionState(generateArithmeticQuestion({ operation: op, digits: 2 }));
@@ -80,6 +108,7 @@ export default function HomeScreen() {
   const handleSelectAdvancedCat = (cat: AdvancedCategory) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      soundController.playTap();
     } catch {}
     setAdvancedCat(cat);
     resetQuestionState(generateAdvancedQuestion(cat));
@@ -109,8 +138,21 @@ export default function HomeScreen() {
     if (correct) {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        soundController.playSuccess();
       } catch {}
       setFeedbackMsg(`🎯 AWESOME! +${result.xpGain} XP`);
+
+      if (gameMode === 'blitz' && blitzActive) {
+        setBlitzScore((prev) => prev + 100 + Math.min(stats.currentStreak, 5) * 10);
+        setBlitzCorrectCount((prev) => prev + 1);
+        setBlitzTotalAnswered((prev) => prev + 1);
+
+        // In blitz mode, auto-advance on correct answers after a brief pause
+        if (nextTimeoutRef.current) clearTimeout(nextTimeoutRef.current);
+        nextTimeoutRef.current = setTimeout(() => {
+          loadNextQuestion();
+        }, 400);
+      }
 
       if (result.leveledUp) {
         setNewLevelReached(result.newLevel);
@@ -119,22 +161,100 @@ export default function HomeScreen() {
     } else {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        soundController.playError();
       } catch {}
       setFeedbackMsg(`❌ Oops! Answer is ${question.correctAnswer}`);
+
+      if (gameMode === 'blitz' && blitzActive) {
+        setBlitzTotalAnswered((prev) => prev + 1);
+      }
     }
+  };
+
+  // 50-50 Power-Up Handler
+  const handleUseFiftyFifty = async () => {
+    if (!question || eliminatedOptions.length > 0 || stats.powerUps.fiftyFifty <= 0 || isAnswered) {
+      return;
+    }
+    const success = await consumeFiftyFifty();
+    if (!success) return;
+
+    soundController.playTap();
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    } catch {}
+
+    const wrongOptions = question.options.filter(
+      (opt) => String(opt) !== String(question.correctAnswer)
+    );
+    const toEliminate = wrongOptions.slice(0, 2);
+    setEliminatedOptions(toEliminate);
+  };
+
+  // Blitz Mode Countdown Timer
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    if (gameMode === 'blitz' && blitzActive && blitzSecondsLeft > 0) {
+      timer = setInterval(() => {
+        setBlitzSecondsLeft((prev) => {
+          if (prev <= 1) {
+            return 0;
+          }
+          if (prev <= 6) {
+            soundController.playTick();
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [gameMode, blitzActive, blitzSecondsLeft]);
+
+  // Handle Blitz completion when time hits 0
+  useEffect(() => {
+    if (gameMode === 'blitz' && blitzActive && blitzSecondsLeft === 0) {
+      const finalizeBlitz = async () => {
+        setBlitzActive(false);
+        const bonusXp = Math.round(blitzScore * 0.15) + (blitzCorrectCount * 5);
+        setBlitzBonusXp(bonusXp);
+        const res = await recordBlitzResult(blitzScore, bonusXp);
+        setBlitzNewHighScore(res.isNewHighScore);
+        setBlitzSummaryVisible(true);
+      };
+      finalizeBlitz();
+    }
+  }, [gameMode, blitzActive, blitzSecondsLeft, blitzScore, blitzCorrectCount, recordBlitzResult]);
+
+  const startBlitzSession = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      soundController.playTap();
+    } catch {}
+    setBlitzSecondsLeft(60);
+    setBlitzScore(0);
+    setBlitzCorrectCount(0);
+    setBlitzTotalAnswered(0);
+    setBlitzSummaryVisible(false);
+    setBlitzActive(true);
+    setEliminatedOptions([]);
+    loadNextQuestion();
   };
 
   // Calculator logic
   const handleCalcPress = (val: string) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      soundController.playTap();
     } catch {}
     if (val === 'C') {
       setCalcExpr('');
       setCalcResult('');
     } else if (val === '=') {
       try {
-        // Safe evaluation for basic arithmetic expressions
         const sanitized = calcExpr.replace(/×/g, '*').replace(/÷/g, '/');
         const evaluated = Function(`'use strict'; return (${sanitized})`)();
         setCalcResult(String(Number(evaluated.toFixed(4))));
@@ -152,19 +272,96 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. Header & Stats Banner */}
+        {/* 1. Header & Utility Controls */}
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.appTitle}>MATH CRUSH</Text>
             <Text style={styles.appSubtitle}>Neo-Brutalist Mental Arena</Text>
           </View>
-          <NeoButton
-            variant="butterYellow"
-            size="sm"
-            onPress={() => setCalcVisible(true)}
-            title="🧮 CALC"
-          />
+
+          <View style={styles.headerControls}>
+            <NeoButton
+              variant={stats.soundEnabled ? 'mint' : 'card'}
+              size="sm"
+              onPress={toggleSound}
+              title={stats.soundEnabled ? '🔊 ON' : '🔇 OFF'}
+              style={styles.utilityBtn}
+            />
+            <NeoButton
+              variant="butterYellow"
+              size="sm"
+              onPress={() => {
+                soundController.playTap();
+                setCalcVisible(true);
+              }}
+              title="🧮 CALC"
+              style={styles.utilityBtn}
+            />
+          </View>
         </View>
+
+        {/* 2. Game Mode Selector: Classic vs Blitz */}
+        <View style={styles.modeToggleRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.modeButton,
+              gameMode === 'classic' && styles.modeButtonActive,
+              pressed && styles.pressedShift,
+            ]}
+            onPress={() => {
+              soundController.playTap();
+              setGameMode('classic');
+              setBlitzActive(false);
+            }}
+          >
+            <Text style={styles.modeButtonText}>🎮 CLASSIC PRACTICE</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.modeButton,
+              gameMode === 'blitz' && styles.modeButtonBlitzActive,
+              pressed && styles.pressedShift,
+            ]}
+            onPress={() => {
+              soundController.playTap();
+              setGameMode('blitz');
+            }}
+          >
+            <Text style={styles.modeButtonText}>⚡ 60s BLITZ</Text>
+          </Pressable>
+        </View>
+
+        {/* Blitz Mode Banner / Timer */}
+        {gameMode === 'blitz' && (
+          <>
+            {blitzActive ? (
+              <BlitzTimerBar
+                secondsLeft={blitzSecondsLeft}
+                totalSeconds={60}
+                score={blitzScore}
+              />
+            ) : (
+              <NeoCard variant="butterYellow" style={styles.blitzBannerCard}>
+                <View style={styles.blitzBannerHeader}>
+                  <Text style={styles.blitzBannerTitle}>⚡ 60-SECOND SPEEDRUN</Text>
+                  <Text style={styles.blitzHighScoreText}>
+                    RECORD: {stats.blitzHighScore} PTS
+                  </Text>
+                </View>
+                <Text style={styles.blitzBannerDesc}>
+                  Solve as many calculations as possible in 1 minute. Earn speed multipliers and bonus XP!
+                </Text>
+                <NeoButton
+                  variant="mint"
+                  size="lg"
+                  title="START 60s RUN ➔"
+                  onPress={startBlitzSession}
+                  style={styles.startBlitzBtn}
+                />
+              </NeoCard>
+            )}
+          </>
+        )}
 
         {/* Stats Strip */}
         <View style={styles.statsGrid}>
@@ -186,22 +383,48 @@ export default function HomeScreen() {
           </NeoCard>
         </View>
 
-        {/* 2. Tier & Category Selector */}
+        {/* Power-ups Inventory Bar */}
+        <View style={styles.powerUpsRow}>
+          <Pressable
+            disabled={stats.powerUps.fiftyFifty <= 0 || eliminatedOptions.length > 0 || isAnswered}
+            style={({ pressed }) => [
+              styles.powerUpPill,
+              { backgroundColor: Palette.peach },
+              (stats.powerUps.fiftyFifty <= 0 || eliminatedOptions.length > 0) && styles.powerUpDisabled,
+              pressed && styles.pressedShift,
+            ]}
+            onPress={handleUseFiftyFifty}
+          >
+            <Text style={styles.powerUpText}>
+              🎯 50-50 ({stats.powerUps.fiftyFifty})
+            </Text>
+          </Pressable>
+
+          <View style={[styles.powerUpPill, { backgroundColor: Palette.butterYellow }]}>
+            <Text style={styles.powerUpText}>
+              🛡️ SHIELD ({stats.powerUps.streakFreeze})
+            </Text>
+          </View>
+        </View>
+
+        {/* 3. Tier & Category Selector */}
         <NeoCard variant="card" style={styles.selectorCard}>
           <View style={styles.tierToggleRow}>
             <Pressable
-              style={[
+              style={({ pressed }) => [
                 styles.tierButton,
                 tier === 'arithmetic' && styles.tierButtonActive,
+                pressed && styles.pressedShift,
               ]}
               onPress={() => handleSelectTier('arithmetic')}
             >
               <Text style={styles.tierButtonText}>ARITHMETIC</Text>
             </Pressable>
             <Pressable
-              style={[
+              style={({ pressed }) => [
                 styles.tierButton,
                 tier === 'advanced' && styles.tierButtonActive,
+                pressed && styles.pressedShift,
               ]}
               onPress={() => handleSelectTier('advanced')}
             >
@@ -220,9 +443,10 @@ export default function HomeScreen() {
                 {(['addition', 'subtraction', 'multiplication', 'division', 'mixed'] as OperationType[]).map((op) => (
                   <Pressable
                     key={op}
-                    style={[
+                    style={({ pressed }) => [
                       styles.subBadge,
                       arithmeticOp === op && styles.subBadgeActive,
+                      pressed && styles.pressedShift,
                     ]}
                     onPress={() => handleSelectArithmeticOp(op)}
                   >
@@ -241,9 +465,10 @@ export default function HomeScreen() {
                 {(['trigonometry', 'squares', 'roots', 'cubes', 'percentages'] as AdvancedCategory[]).map((cat) => (
                   <Pressable
                     key={cat}
-                    style={[
+                    style={({ pressed }) => [
                       styles.subBadge,
                       advancedCat === cat && styles.subBadgeActive,
+                      pressed && styles.pressedShift,
                     ]}
                     onPress={() => handleSelectAdvancedCat(cat)}
                   >
@@ -261,7 +486,7 @@ export default function HomeScreen() {
           </ScrollView>
         </NeoCard>
 
-        {/* 3. Gameplay Card */}
+        {/* 4. Gameplay Card */}
         {question && (
           <NeoCard variant="white" style={styles.questionCard} shadowDistance={4}>
             <View style={styles.questionTagRow}>
@@ -281,6 +506,7 @@ export default function HomeScreen() {
               {question.options.map((opt, index) => {
                 const isSelected = selectedOption === opt;
                 const isTheCorrect = isAnswered && String(opt) === String(question.correctAnswer);
+                const isEliminated = eliminatedOptions.includes(opt);
 
                 let variant: 'card' | 'mint' | 'softCoral' = 'card';
                 if (isAnswered) {
@@ -293,10 +519,10 @@ export default function HomeScreen() {
                     key={`${question.id}_${index}`}
                     variant={variant}
                     onPress={() => handleSelectOption(opt)}
-                    disabled={isAnswered}
-                    style={styles.optionButton}
-                    textStyle={styles.optionText}
-                    title={String(opt)}
+                    disabled={isAnswered || isEliminated}
+                    style={[styles.optionButton, isEliminated && styles.eliminatedButton]}
+                    textStyle={[styles.optionText, isEliminated && styles.eliminatedText]}
+                    title={isEliminated ? '✕' : String(opt)}
                   />
                 );
               })}
@@ -321,11 +547,11 @@ export default function HomeScreen() {
           </NeoCard>
         )}
 
-        {/* 4. Monetization Banner */}
+        {/* 5. Monetization Banner */}
         <NeoAdBanner variant="peach" />
       </ScrollView>
 
-      {/* 4. Built-in Pastel Calculator Modal */}
+      {/* Built-in Pastel Calculator Modal */}
       <Modal
         visible={calcVisible}
         transparent
@@ -369,11 +595,26 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* 5. Level Up Celebration Modal */}
+      {/* Level Up Celebration Modal */}
       <LevelUpModal
         visible={levelUpVisible}
         level={newLevelReached}
         onDismiss={() => setLevelUpVisible(false)}
+      />
+
+      {/* Blitz Session Summary Modal */}
+      <BlitzSummaryModal
+        visible={blitzSummaryVisible}
+        score={blitzScore}
+        correctCount={blitzCorrectCount}
+        totalAnswered={blitzTotalAnswered}
+        bonusXp={blitzBonusXp}
+        isNewHighScore={blitzNewHighScore}
+        onPlayAgain={startBlitzSession}
+        onExit={() => {
+          setBlitzSummaryVisible(false);
+          setGameMode('classic');
+        }}
       />
     </SafeAreaView>
   );
@@ -395,17 +636,85 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xs,
   },
+  headerControls: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+  },
+  utilityBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
   appTitle: {
     fontFamily: Typography.display,
-    fontSize: 28,
+    fontSize: 26,
     color: Palette.text,
     letterSpacing: 0.5,
   },
   appSubtitle: {
     fontFamily: Typography.sans,
-    fontSize: 13,
+    fontSize: 12,
     color: Palette.textMuted,
     fontWeight: '600',
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    backgroundColor: Palette.white,
+    borderWidth: 2.5,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.md,
+    padding: 3,
+    gap: 4,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: BorderRadius.sm,
+  },
+  modeButtonActive: {
+    backgroundColor: Palette.mint,
+    borderWidth: 2,
+    borderColor: Palette.border,
+  },
+  modeButtonBlitzActive: {
+    backgroundColor: Palette.butterYellow,
+    borderWidth: 2,
+    borderColor: Palette.border,
+  },
+  modeButtonText: {
+    fontFamily: Typography.badge,
+    fontSize: 12,
+    fontWeight: '800',
+    color: Palette.text,
+  },
+  blitzBannerCard: {
+    padding: Spacing.md,
+    gap: Spacing.xs,
+  },
+  blitzBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  blitzBannerTitle: {
+    fontFamily: Typography.display,
+    fontSize: 18,
+    color: Palette.text,
+  },
+  blitzHighScoreText: {
+    fontFamily: Typography.badge,
+    fontSize: 11,
+    fontWeight: '800',
+    color: Palette.text,
+  },
+  blitzBannerDesc: {
+    fontFamily: Typography.sans,
+    fontSize: 12,
+    color: Palette.textMuted,
+    lineHeight: 16,
+  },
+  startBlitzBtn: {
+    marginTop: Spacing.xs,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -431,6 +740,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Palette.text,
     marginTop: 2,
+  },
+  powerUpsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  powerUpPill: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: Palette.border,
+    borderRadius: BorderRadius.sm,
+    paddingVertical: 8,
+    alignItems: 'center',
+    ...NeoStyles.badge,
+  },
+  powerUpDisabled: {
+    opacity: 0.45,
+  },
+  powerUpText: {
+    fontFamily: Typography.badge,
+    fontSize: 11,
+    fontWeight: '800',
+    color: Palette.text,
   },
   selectorCard: {
     padding: Spacing.sm,
@@ -532,6 +863,13 @@ const styles = StyleSheet.create({
   optionButton: {
     width: '48%',
     minHeight: 56,
+  },
+  eliminatedButton: {
+    backgroundColor: '#E4E4E7',
+    opacity: 0.4,
+  },
+  eliminatedText: {
+    color: '#A1A1AA',
   },
   optionText: {
     fontFamily: Typography.display,
@@ -638,5 +976,8 @@ const styles = StyleSheet.create({
   calcKeyPressed: {
     transform: [{ translateX: 1 }, { translateY: 1 }],
     elevation: 1,
+  },
+  pressedShift: {
+    transform: [{ translateX: 1 }, { translateY: 1 }],
   },
 });

@@ -9,11 +9,19 @@ import {
   getYesterdayDateString,
   calculateLevel,
 } from '@/utils/storage';
+import { soundController } from '@/utils/audio';
 
 export interface RecordAnswerResult {
   stats: GameStats;
   leveledUp: boolean;
   xpGain: number;
+  newLevel: number;
+}
+
+export interface BlitzSessionResult {
+  stats: GameStats;
+  isNewHighScore: boolean;
+  leveledUp: boolean;
   newLevel: number;
 }
 
@@ -26,6 +34,7 @@ export const useGameStats = () => {
     setLoading(true);
     const loaded = await loadGameStats();
     setStats(loaded);
+    soundController.setSoundEnabled(loaded.soundEnabled);
     setLoading(false);
   }, []);
 
@@ -34,6 +43,7 @@ export const useGameStats = () => {
     loadGameStats().then((loaded) => {
       if (isMounted) {
         setStats(loaded);
+        soundController.setSoundEnabled(loaded.soundEnabled);
         setLoading(false);
       }
     });
@@ -53,15 +63,14 @@ export const useGameStats = () => {
       let newStreak = stats.currentStreak;
 
       // Handle daily streaks
-      if (stats.lastActiveDate === today) {
-        // Already active today; streak maintained
-        newStreak = Math.max(1, stats.currentStreak);
-      } else if (stats.lastActiveDate === yesterday) {
-        // Consecutive active day!
-        newStreak = stats.currentStreak + 1;
-      } else {
-        // Missed one or more days; start fresh
-        newStreak = 1;
+      if (isCorrect) {
+        if (stats.lastActiveDate === today) {
+          newStreak = Math.max(1, stats.currentStreak);
+        } else if (stats.lastActiveDate === yesterday) {
+          newStreak = stats.currentStreak + 1;
+        } else {
+          newStreak = 1;
+        }
       }
 
       const bestStreak = Math.max(stats.bestStreak, newStreak);
@@ -102,17 +111,103 @@ export const useGameStats = () => {
   );
 
   /**
+   * Deducts 1 50-50 power-up from inventory if available
+   */
+  const consumeFiftyFifty = useCallback(async (): Promise<boolean> => {
+    if (stats.powerUps.fiftyFifty <= 0) return false;
+
+    const updatedStats: GameStats = {
+      ...stats,
+      powerUps: {
+        ...stats.powerUps,
+        fiftyFifty: stats.powerUps.fiftyFifty - 1,
+      },
+    };
+    setStats(updatedStats);
+    await saveGameStats(updatedStats);
+    return true;
+  }, [stats]);
+
+  /**
+   * Consumes 1 streak freeze shield
+   */
+  const consumeStreakFreeze = useCallback(async (): Promise<boolean> => {
+    if (stats.powerUps.streakFreeze <= 0) return false;
+
+    const updatedStats: GameStats = {
+      ...stats,
+      powerUps: {
+        ...stats.powerUps,
+        streakFreeze: stats.powerUps.streakFreeze - 1,
+      },
+    };
+    setStats(updatedStats);
+    await saveGameStats(updatedStats);
+    return true;
+  }, [stats]);
+
+  /**
+   * Saves Blitz mode session score, awards bonus XP, and tracks high scores
+   */
+  const recordBlitzResult = useCallback(
+    async (score: number, bonusXp: number): Promise<BlitzSessionResult> => {
+      const isNewHighScore = score > stats.blitzHighScore;
+      const newHighScore = Math.max(stats.blitzHighScore, score);
+      const newXp = stats.xp + bonusXp;
+      const newLevel = calculateLevel(newXp);
+      const leveledUp = newLevel > stats.level;
+
+      const updatedStats: GameStats = {
+        ...stats,
+        xp: newXp,
+        level: newLevel,
+        blitzHighScore: newHighScore,
+      };
+
+      setStats(updatedStats);
+      await saveGameStats(updatedStats);
+      return {
+        stats: updatedStats,
+        isNewHighScore,
+        leveledUp,
+        newLevel,
+      };
+    },
+    [stats]
+  );
+
+  /**
+   * Toggles global sound state
+   */
+  const toggleSound = useCallback(async (): Promise<boolean> => {
+    const nextState = !stats.soundEnabled;
+    soundController.setSoundEnabled(nextState);
+    const updatedStats: GameStats = {
+      ...stats,
+      soundEnabled: nextState,
+    };
+    setStats(updatedStats);
+    await saveGameStats(updatedStats);
+    return nextState;
+  }, [stats]);
+
+  /**
    * Clears all progress and resets to initial defaults
    */
   const resetStats = useCallback(async () => {
     await clearGameStats();
     setStats(INITIAL_GAME_STATS);
+    soundController.setSoundEnabled(true);
   }, []);
 
   return {
     stats,
     loading,
     recordAnswer,
+    consumeFiftyFifty,
+    consumeStreakFreeze,
+    recordBlitzResult,
+    toggleSound,
     resetStats,
     refreshStats,
   };

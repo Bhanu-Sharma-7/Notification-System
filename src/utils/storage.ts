@@ -1,5 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export interface PowerUps {
+  fiftyFifty: number;
+  streakFreeze: number;
+}
+
 export interface GameStats {
   xp: number;
   level: number;
@@ -10,6 +15,9 @@ export interface GameStats {
   totalCorrect: number;
   totalWrong: number;
   categoryHighScores: Record<string, number>;
+  blitzHighScore: number;
+  powerUps: PowerUps;
+  soundEnabled: boolean;
 }
 
 export const INITIAL_GAME_STATS: GameStats = {
@@ -22,9 +30,15 @@ export const INITIAL_GAME_STATS: GameStats = {
   totalCorrect: 0,
   totalWrong: 0,
   categoryHighScores: {},
+  blitzHighScore: 0,
+  powerUps: {
+    fiftyFifty: 3,
+    streakFreeze: 1,
+  },
+  soundEnabled: true,
 };
 
-const STORAGE_KEY = '@math_game_stats_v1';
+const STORAGE_KEY = '@math_game_stats_v2';
 
 export const getTodayDateString = (): string => {
   const today = new Date();
@@ -59,6 +73,10 @@ export const loadGameStats = async (): Promise<GameStats> => {
     return {
       ...INITIAL_GAME_STATS,
       ...parsed,
+      powerUps: {
+        ...INITIAL_GAME_STATS.powerUps,
+        ...(parsed.powerUps ?? {}),
+      },
       level: calculateLevel(parsed.xp ?? 0),
     };
   } catch (error) {
